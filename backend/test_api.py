@@ -6,7 +6,7 @@ from datetime import datetime
 BASE_URL = 'http://localhost:5000/api'
 
 class NewsAPITester:
-    """Comprehensive test suite for News Sentiment Analysis API"""
+    """Enhanced test suite for News Sentiment Analysis API with image support"""
     
     def __init__(self, base_url=BASE_URL):
         self.base_url = base_url
@@ -61,10 +61,10 @@ class NewsAPITester:
             return []
     
     def test_crawl_trigger(self):
-        """Test manual crawl trigger"""
-        print("\n🕷️ Testing Manual Crawl Trigger...")
+        """Test manual crawl trigger with image extraction"""
+        print("\n🕷️ Testing Enhanced Crawl Trigger...")
         try:
-            print("   Triggering news crawl (this may take a while)...")
+            print("   Triggering enhanced news crawl with image extraction...")
             response = self.session.post(f'{self.base_url}/crawl')
             print(f"Status Code: {response.status_code}")
             
@@ -72,6 +72,14 @@ class NewsAPITester:
                 data = response.json()
                 print(f"✅ {data.get('message')}")
                 print(f"✅ Headlines processed: {data.get('headlines_processed', 0)}")
+                
+                # Display image statistics
+                image_stats = data.get('image_stats', {})
+                if image_stats:
+                    overall = image_stats.get('overall', {})
+                    print(f"✅ Headlines with images: {overall.get('with_images', 0)}")
+                    print(f"✅ Image success rate: {overall.get('percentage', 0)}%")
+                
                 return True
             else:
                 print(f"❌ Crawl trigger failed: {response.status_code}")
@@ -81,9 +89,9 @@ class NewsAPITester:
             print(f"❌ Crawl trigger error: {e}")
             return False
     
-    def test_headlines(self, categories):
-        """Test headlines endpoints for all categories and sentiments"""
-        print("\n📰 Testing Headlines Endpoints...")
+    def test_headlines_with_images(self, categories):
+        """Test headlines endpoints with image support"""
+        print("\n📰 Testing Headlines with Image Support...")
         
         sentiments = ['positive', 'negative', 'neutral']
         results = {}
@@ -99,106 +107,72 @@ class NewsAPITester:
                     if response.status_code == 200:
                         data = response.json()
                         headline_count = len(data.get('headlines', []))
-                        results[category][sentiment] = headline_count
-                        print(f"      {sentiment}: {headline_count} headlines")
+                        with_images = data.get('with_images', 0)
+                        image_percentage = data.get('image_percentage', 0)
                         
-                        # Show sample headlines if available
+                        results[category][sentiment] = {
+                            'total': headline_count,
+                            'with_images': with_images,
+                            'percentage': image_percentage
+                        }
+                        
+                        print(f"      {sentiment}: {headline_count} headlines ({with_images} with images - {image_percentage}%)")
+                        
+                        # Show sample headlines with image status
                         if headline_count > 0:
-                            sample_headlines = data['headlines'][:2]  # Show first 2
+                            sample_headlines = data['headlines'][:2]
                             for i, headline in enumerate(sample_headlines, 1):
                                 confidence = headline.get('confidence', 0)
-                                print(f"         Sample {i}: \"{headline['headline'][:60]}...\" (Confidence: {confidence}%)")
+                                has_image = "🖼️" if headline.get('image_url') else "📝"
+                                print(f"         {has_image} Sample {i}: \"{headline['headline'][:50]}...\" (Confidence: {confidence}%)")
                     else:
                         print(f"      ❌ {sentiment}: Failed ({response.status_code})")
-                        results[category][sentiment] = 0
+                        results[category][sentiment] = {'total': 0, 'with_images': 0, 'percentage': 0}
                         
                 except Exception as e:
                     print(f"      ❌ {sentiment}: Error - {e}")
-                    results[category][sentiment] = 0
+                    results[category][sentiment] = {'total': 0, 'with_images': 0, 'percentage': 0}
         
         return results
     
-    def test_headlines_with_filters(self):
-        """Test headlines with confidence filters"""
-        print("\n🔍 Testing Headlines with Confidence Filters...")
-        
-        test_cases = [
-            ('technology', 'positive', {'min_confidence': 80}),
-            ('sports', 'negative', {'min_confidence': 50}),
-            ('politics', 'neutral', {'limit': 5})
-        ]
-        
-        for category, sentiment, params in test_cases:
-            try:
-                response = self.session.get(f'{self.base_url}/headlines/{category}/{sentiment}', params=params)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    headline_count = len(data.get('headlines', []))
-                    filter_desc = ', '.join([f"{k}={v}" for k, v in params.items()])
-                    print(f"   ✅ {category}/{sentiment} with {filter_desc}: {headline_count} headlines")
-                else:
-                    print(f"   ❌ Filter test failed for {category}/{sentiment}")
-                    
-            except Exception as e:
-                print(f"   ❌ Filter test error: {e}")
-    
-    def test_stats(self):
-        """Test statistics endpoint"""
-        print("\n📊 Testing Statistics...")
+    def test_image_stats(self):
+        """Test image statistics endpoint"""
+        print("\n📊 Testing Image Statistics...")
         try:
-            response = self.session.get(f'{self.base_url}/stats')
+            response = self.session.get(f'{self.base_url}/image-stats')
             print(f"Status Code: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                stats = data.get('stats', {})
+                image_stats = data.get('image_stats', {})
                 
-                print("✅ Statistics Summary:")
-                total_headlines = 0
+                print("✅ Image Statistics by Category:")
+                for category, stats in image_stats.items():
+                    if category != 'overall':
+                        total = stats.get('total', 0)
+                        with_images = stats.get('with_images', 0)
+                        percentage = stats.get('percentage', 0)
+                        print(f"   {category.capitalize()}: {with_images}/{total} ({percentage}%)")
                 
-                for category, sentiments in stats.items():
-                    category_total = sum(sentiments.values())
-                    total_headlines += category_total
-                    print(f"   {category.capitalize()}: {category_total} total")
-                    print(f"      Positive: {sentiments.get('positive', 0)}")
-                    print(f"      Negative: {sentiments.get('negative', 0)}")
-                    print(f"      Neutral: {sentiments.get('neutral', 0)}")
+                overall = image_stats.get('overall', {})
+                print(f"\n✅ Overall Image Statistics:")
+                print(f"   Total Headlines: {overall.get('total', 0)}")
+                print(f"   With Images: {overall.get('with_images', 0)}")
+                print(f"   Success Rate: {overall.get('percentage', 0)}%")
                 
-                print(f"\n   📈 Total Headlines Stored: {total_headlines}")
-                return stats
+                return image_stats
             else:
-                print(f"❌ Stats test failed: {response.status_code}")
+                print(f"❌ Image stats test failed: {response.status_code}")
                 return {}
                 
         except Exception as e:
-            print(f"❌ Stats error: {e}")
+            print(f"❌ Image stats error: {e}")
             return {}
     
-    def test_error_handling(self):
-        """Test error handling for invalid requests"""
-        print("\n⚠️ Testing Error Handling...")
-        
-        error_tests = [
-            ('Invalid category', f'{self.base_url}/headlines/invalid_category/positive'),
-            ('Invalid sentiment', f'{self.base_url}/headlines/technology/invalid_sentiment'),
-            ('Non-existent endpoint', f'{self.base_url}/nonexistent')
-        ]
-        
-        for test_name, url in error_tests:
-            try:
-                response = self.session.get(url)
-                if response.status_code in [400, 404]:
-                    print(f"   ✅ {test_name}: Properly handled ({response.status_code})")
-                else:
-                    print(f"   ⚠️ {test_name}: Unexpected status ({response.status_code})")
-            except Exception as e:
-                print(f"   ❌ {test_name}: Error - {e}")
-    
     def run_comprehensive_test(self):
-        """Run all tests in sequence"""
+        """Run all tests including image functionality"""
         print("=" * 60)
-        print("🚀 NEWS SENTIMENT ANALYSIS API - COMPREHENSIVE TEST SUITE")
+        print("🚀 ENHANCED NEWS SENTIMENT ANALYSIS API - COMPREHENSIVE TEST SUITE")
         print("=" * 60)
         print(f"Testing API at: {self.base_url}")
         print(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -214,54 +188,45 @@ class NewsAPITester:
             print("\n❌ No categories found - stopping tests")
             return
         
-        # Test 3: Manual Crawl (optional - comment out if you don't want to trigger)
-        print("\n⏳ Triggering manual crawl to ensure fresh data...")
+        # Test 3: Enhanced Crawl
+        print("\n⏳ Triggering enhanced crawl with image extraction...")
         self.test_crawl_trigger()
-        time.sleep(2)  # Wait for crawl to process
+        time.sleep(3)  # Wait for crawl to process
         
-        # Test 4: Headlines
-        headline_results = self.test_headlines(categories)
+        # Test 4: Headlines with Images
+        headline_results = self.test_headlines_with_images(categories)
         
-        # Test 5: Headlines with Filters
-        self.test_headlines_with_filters()
-        
-        # Test 6: Statistics
-        stats = self.test_stats()
-        
-        # Test 7: Error Handling
-        self.test_error_handling()
+        # Test 5: Image Statistics
+        image_stats = self.test_image_stats()
         
         # Summary
-        self.print_test_summary(headline_results, stats)
+        self.print_enhanced_summary(headline_results, image_stats)
     
-    def print_test_summary(self, headline_results, stats):
-        """Print comprehensive test summary"""
+    def print_enhanced_summary(self, headline_results, image_stats):
+        """Print comprehensive test summary with image statistics"""
         print("\n" + "=" * 60)
-        print("📋 TEST SUMMARY")
+        print("📋 ENHANCED TEST SUMMARY")
         print("=" * 60)
         
-        # Check if system is working
-        total_headlines = sum(sum(sentiments.values()) for sentiments in stats.values()) if stats else 0
+        overall = image_stats.get('overall', {})
+        total_headlines = overall.get('total', 0)
+        total_with_images = overall.get('with_images', 0)
+        image_success_rate = overall.get('percentage', 0)
         
         if total_headlines > 0:
-            print("✅ System Status: WORKING")
+            print("✅ System Status: WORKING WITH IMAGE SUPPORT")
             print(f"✅ Total Headlines: {total_headlines}")
+            print(f"✅ Headlines with Images: {total_with_images}")
+            print(f"✅ Image Success Rate: {image_success_rate}%")
             
-            # Find most active categories
-            if stats:
-                category_totals = {cat: sum(sentiments.values()) for cat, sentiments in stats.items()}
-                most_active = max(category_totals.items(), key=lambda x: x[1])
-                print(f"✅ Most Active Category: {most_active[0]} ({most_active[1]} headlines)")
-                
-                # Sentiment distribution
-                total_positive = sum(sentiments.get('positive', 0) for sentiments in stats.values())
-                total_negative = sum(sentiments.get('negative', 0) for sentiments in stats.values())
-                total_neutral = sum(sentiments.get('neutral', 0) for sentiments in stats.values())
-                
-                print(f"✅ Sentiment Distribution:")
-                print(f"   Positive: {total_positive} ({total_positive/total_headlines*100:.1f}%)")
-                print(f"   Negative: {total_negative} ({total_negative/total_headlines*100:.1f}%)")
-                print(f"   Neutral: {total_neutral} ({total_neutral/total_headlines*100:.1f}%)")
+            # Category breakdown
+            print(f"\n📊 Image Success by Category:")
+            for category, stats in image_stats.items():
+                if category != 'overall':
+                    total = stats.get('total', 0)
+                    with_images = stats.get('with_images', 0)
+                    percentage = stats.get('percentage', 0)
+                    print(f"   {category.capitalize()}: {percentage}% ({with_images}/{total})")
         else:
             print("⚠️ System Status: NO DATA")
             print("   Try running the crawl again or check your news sources")

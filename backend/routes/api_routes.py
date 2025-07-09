@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from datetime import datetime
 import json
 from config.settings import NEWS_SOURCES
 from services.redis_client import redis_client
@@ -24,7 +25,7 @@ def get_categories():
 
 @api_bp.route('/headlines/<category>/<sentiment>', methods=['GET'])
 def get_headlines(category, sentiment):
-    """Get headlines for specific category and sentiment"""
+    """Get headlines for specific category and sentiment with image support"""
     try:
         # Validate parameters
         if category not in NEWS_SOURCES:
@@ -36,29 +37,35 @@ def get_headlines(category, sentiment):
         # Get query parameters
         min_confidence = request.args.get('min_confidence', type=float)
         limit = request.args.get('limit', default=20, type=int)
+        images_only = request.args.get('images_only', default=False, type=bool)
         
-        # Fetch from Redis
-        headlines_data = redis_client.get_headlines(category, sentiment, limit)
+        # Fetch from Redis (now includes image URLs)
+        headlines = redis_client.get_headlines(category, sentiment, limit)
         
-        # Parse and filter headlines
-        headlines = []
-        for headline_json in headlines_data:
-            try:
-                headline = json.loads(headline_json)
-                
-                # Apply confidence filter if specified
-                if min_confidence and headline['confidence'] < min_confidence:
-                    continue
-                
-                headlines.append(headline)
-            except json.JSONDecodeError:
+        # Apply filters
+        filtered_headlines = []
+        for headline in headlines:
+            # Apply confidence filter if specified
+            if min_confidence and headline['confidence'] < min_confidence:
                 continue
+            
+            # Apply images_only filter if specified
+            if images_only and not headline.get('image_url'):
+                continue
+            
+            filtered_headlines.append(headline)
+        
+        # Calculate image statistics for this response
+        total_headlines = len(filtered_headlines)
+        headlines_with_images = sum(1 for h in filtered_headlines if h.get('image_url'))
         
         return jsonify({
-            'headlines': headlines,
+            'headlines': filtered_headlines,
             'category': category,
             'sentiment': sentiment,
-            'total': len(headlines)
+            'total': total_headlines,
+            'with_images': headlines_with_images,
+            'image_percentage': round((headlines_with_images / total_headlines) * 100, 1) if total_headlines > 0 else 0
         })
         
     except Exception as e:
@@ -66,12 +73,17 @@ def get_headlines(category, sentiment):
 
 @api_bp.route('/crawl', methods=['POST'])
 def trigger_crawl():
-    """Manually trigger news crawling"""
+    """Manually trigger news crawling with enhanced image extraction"""
     try:
         total_processed = news_service.crawl_and_process_news()
+        
+        # Get image statistics after crawl
+        image_stats = redis_client.get_image_stats(NEWS_SOURCES.keys())
+        
         return jsonify({
-            'message': 'News crawl completed successfully',
-            'headlines_processed': total_processed
+            'message': 'Enhanced news crawl completed successfully',
+            'headlines_processed': total_processed,
+            'image_stats': image_stats
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -82,6 +94,15 @@ def get_stats():
     try:
         stats = redis_client.get_stats(NEWS_SOURCES.keys())
         return jsonify({'stats': stats})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/image-stats', methods=['GET'])
+def get_image_stats():
+    """Get detailed statistics about headlines with images"""
+    try:
+        image_stats = redis_client.get_image_stats(NEWS_SOURCES.keys())
+        return jsonify({'image_stats': image_stats})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
