@@ -4,6 +4,7 @@ import json
 from config.settings import NEWS_SOURCES
 from services.redis_client import redis_client
 from services.news_processor import NewsProcessingService
+from services.live_feed_service import live_feed_service
 
 # Create Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -121,4 +122,68 @@ def health_check():
         return jsonify({
             'status': 'unhealthy',
             'error': str(e)
+        }), 500
+
+@api_bp.route('/live-feed', methods=['GET'])
+def get_live_feed():
+    """Get live feed headlines for immediate display"""
+    try:
+        force_refresh = request.args.get('refresh', default=False, type=bool)
+        
+        result = live_feed_service.get_live_feed(force_refresh=force_refresh)
+        
+        if result['success']:
+            data = result['data']
+            return jsonify({
+                'headlines': data.get('headlines', []),
+                'total': data.get('total', 0),
+                'timestamp': data.get('timestamp'),
+                'from_cache': result.get('from_cache', False),
+                'status': 'success'
+            })
+        else:
+            return jsonify({
+                'headlines': [],
+                'total': 0,
+                'error': result.get('error'),
+                'status': 'error'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'headlines': [],
+            'total': 0,
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+@api_bp.route('/live-feed/refresh', methods=['POST'])
+def refresh_live_feed():
+    """Manually refresh live feed"""
+    try:
+        # Start background refresh
+        live_feed_service.refresh_async()
+        
+        return jsonify({
+            'message': 'Live feed refresh started',
+            'status': 'refreshing'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+@api_bp.route('/live-feed/status', methods=['GET'])
+def get_live_feed_status():
+    """Get live feed status"""
+    try:
+        status = live_feed_service.get_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
         }), 500

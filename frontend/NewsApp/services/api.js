@@ -46,6 +46,39 @@ class NewsAPI {
       throw this.handleError(error);
     }
   }
+  // Add these methods to your NewsAPI class
+
+// Get live feed headlines
+    async getLiveFeed(forceRefresh = false) {
+    try {
+        const params = forceRefresh ? { refresh: true } : {};
+        const response = await this.client.get('/live-feed', { params });
+        return response.data;
+    } catch (error) {
+        throw this.handleError(error);
+    }
+    }
+
+    // Refresh live feed
+    async refreshLiveFeed() {
+    try {
+        const response = await this.client.post('/live-feed/refresh');
+        return response.data;
+    } catch (error) {
+        throw this.handleError(error);
+    }
+    }
+
+    // Get live feed status
+    async getLiveFeedStatus() {
+    try {
+        const response = await this.client.get('/live-feed/status');
+        return response.data;
+    } catch (error) {
+        throw this.handleError(error);
+    }
+    }
+
 
   // Health check
   async healthCheck() {
