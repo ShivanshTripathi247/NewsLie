@@ -31,16 +31,31 @@ const LiveFeedScreen = ({ navigation }) => {
       const response = await newsAPI.getLiveFeed(forceRefresh);
       
       if (response.headlines) {
-        setHeadlines(response.headlines);
+        // Clean and validate headlines data
+        const cleanedHeadlines = response.headlines
+          .filter(headline => headline && headline.headline) // Remove invalid items
+          .map((headline, index) => ({
+            ...headline,
+            // Ensure unique identifier exists
+            quick_id: headline.quick_id || headline.id || `generated_${Date.now()}_${index}`,
+            // Ensure required fields exist
+            source: headline.source || 'Unknown Source',
+            category: headline.category || 'general',
+            timestamp: headline.timestamp || new Date().toISOString()
+          }));
+        
+        setHeadlines(cleanedHeadlines);
         setLastUpdated(new Date(response.timestamp));
       }
     } catch (err) {
       setError(err.message);
+      console.error('LiveFeed fetch error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -70,26 +85,33 @@ const LiveFeedScreen = ({ navigation }) => {
     }
   };
 
-  const renderHeadline = ({ item, index }) => (
-    <TouchableOpacity 
-      style={styles.headlineCard}
-      onPress={() => handleHeadlinePress(item)}
-    >
-      <View style={styles.headlineHeader}>
-        <Text style={styles.sourceText}>{item.source}</Text>
-        <Text style={styles.categoryBadge}>{item.category.toUpperCase()}</Text>
-      </View>
-      
-      <Text style={styles.headlineText}>{item.headline}</Text>
-      
-      <View style={styles.headlineFooter}>
-        <Text style={styles.timestampText}>
-          {new Date(item.timestamp).toLocaleTimeString()}
-        </Text>
-        <Text style={styles.tapHint}>Tap to read →</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderHeadline = ({ item, index }) => {
+    // Generate unique key for the TouchableOpacity
+    const uniqueKey = `headline_${item.quick_id || item.id || index}_${item.timestamp || Date.now()}`;
+    
+    return (
+      <TouchableOpacity 
+        key={uniqueKey}
+        style={styles.headlineCard}
+        onPress={() => handleHeadlinePress(item)}
+      >
+        <View style={styles.headlineHeader}>
+          <Text style={styles.sourceText}>{item.source}</Text>
+          <Text style={styles.categoryBadge}>{item.category?.toUpperCase() || 'NEWS'}</Text>
+        </View>
+        
+        <Text style={styles.headlineText}>{item.headline}</Text>
+        
+        <View style={styles.headlineFooter}>
+          <Text style={styles.timestampText}>
+            {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'Unknown time'}
+          </Text>
+          <Text style={styles.tapHint}>Tap to read →</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -128,7 +150,12 @@ const LiveFeedScreen = ({ navigation }) => {
       <FlatList
         data={headlines}
         renderItem={renderHeadline}
-        keyExtractor={(item) => item.quick_id}
+        keyExtractor={(item, index) => {
+          // Create unique key using multiple identifiers
+          const baseKey = item.quick_id || item.id || index;
+          const timestamp = item.timestamp || Date.now();
+          return `headline_${baseKey}_${timestamp}_${index}`;
+        }}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         refreshControl={

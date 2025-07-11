@@ -1,7 +1,9 @@
 import json
 from config.settings import NEWS_SOURCES
 from .news_scraper import NewsScraperService
+from .redis_client import redis_client
 from .sentiment_analyzer import SentimentAnalyzer
+
 from services.global_database import global_db
 
 class NewsProcessingService:

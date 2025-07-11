@@ -240,11 +240,51 @@ def analyze_news():
     
 # Add these new endpoints
 
+@api_bp.route('/debug-update/<update_id>', methods=['GET'])
+def debug_update(update_id):
+    """Debug endpoint to check update data"""
+    try:
+        from services.supabase_client import supabase_db
+        
+        # Check if update exists
+        update_result = supabase_db.supabase.table('news_updates')\
+            .select('*')\
+            .eq('update_id', update_id)\
+            .execute()
+        
+        # Check headlines count
+        headlines_result = supabase_db.supabase.table('headlines')\
+            .select('id')\
+            .eq('update_id', update_id)\
+            .execute()
+        
+        return jsonify({
+            'update_exists': bool(update_result.data),
+            'update_data': update_result.data[0] if update_result.data else None,
+            'headlines_count': len(headlines_result.data) if headlines_result.data else 0,
+            'debug_timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @api_bp.route('/check-updates/<client_update_id>', methods=['GET'])
 def check_for_updates(client_update_id):
-    """Check if mobile app needs to sync new data"""
+    """Check if mobile app needs to sync new data with error handling"""
     try:
-        latest_update_id = global_db.get_latest_update_id()
+        from services.supabase_client import supabase_db
+        
+        latest_update_id = supabase_db.get_latest_update_id()
+        
+        if not latest_update_id:
+            return jsonify({
+                'hasUpdate': False,
+                'latestUpdateId': None,
+                'clientUpdateId': client_update_id,
+                'serverTime': datetime.now().isoformat(),
+                'message': 'No updates available'
+            })
         
         has_update = (client_update_id != latest_update_id) if client_update_id != 'none' else True
         
@@ -256,30 +296,81 @@ def check_for_updates(client_update_id):
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Update check error: {e}")
+        return jsonify({
+            'error': 'Service temporarily unavailable',
+            'hasUpdate': False,
+            'latestUpdateId': None,
+            'clientUpdateId': client_update_id,
+            'serverTime': datetime.now().isoformat()
+        }), 500
 
 @api_bp.route('/bulk-download/<update_id>', methods=['GET'])
 def download_bulk_update(update_id):
     """Download complete dataset for mobile local storage"""
     try:
+        print(f"🔍 Bulk download requested for update_id: {update_id}")
+        
         if update_id == 'latest':
-            update_id = global_db.get_latest_update_id()
+            from services.supabase_client import supabase_db
+            update_id = supabase_db.get_latest_update_id()
+            print(f"📋 Latest update_id resolved to: {update_id}")
         
         if not update_id:
+            print("❌ No update_id available")
             return jsonify({'error': 'No updates available'}), 404
         
-        headlines = global_db.get_bulk_data_for_sync(update_id)
+        # Get headlines using your existing supabase client
+        from services.supabase_client import supabase_db
+        headlines = supabase_db.get_bulk_data_for_sync(update_id)
         
-        return jsonify({
+        print(f"📊 Retrieved {len(headlines)} headlines from database")
+        
+        if not headlines:
+            print(f"⚠️ No headlines found for update_id: {update_id}")
+            
+            # Debug: Check if update exists in news_updates table
+            try:
+                update_check = supabase_db.supabase.table('news_updates')\
+                    .select('update_id, total_headlines')\
+                    .eq('update_id', update_id)\
+                    .execute()
+                
+                if update_check.data:
+                    print(f"✅ Update record exists: {update_check.data[0]}")
+                else:
+                    print(f"❌ No update record found for: {update_id}")
+                    
+            except Exception as debug_error:
+                print(f"❌ Debug query failed: {debug_error}")
+            
+            return jsonify({
+                'error': f'No headlines found for update {update_id}',
+                'updateId': update_id,
+                'headlines': [],
+                'totalCount': 0
+            }), 404
+        
+        response_data = {
             'updateId': update_id,
             'headlines': headlines,
             'totalCount': len(headlines),
             'downloadTime': datetime.now().isoformat(),
             'dataSize': f"{len(str(headlines)) / 1024:.1f} KB"
-        })
+        }
+        
+        print(f"✅ Bulk download successful: {len(headlines)} headlines")
+        return jsonify(response_data)
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Bulk download error: {e}")
+        return jsonify({
+            'error': 'Internal server error during bulk download',
+            'details': str(e),
+            'updateId': update_id,
+            'headlines': [],
+            'totalCount': 0
+        }), 500
 
 @api_bp.route('/database-stats', methods=['GET'])
 def get_database_stats():
@@ -289,6 +380,38 @@ def get_database_stats():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/database-health', methods=['GET'])
+def check_database_health():
+    """Check database connectivity and health"""
+    try:
+        from services.supabase_client import supabase_db
+        
+        # Test basic connection
+        result = supabase_db.supabase.table('news_updates').select('id').limit(1).execute()
+        
+        # Get table counts
+        updates_count = supabase_db.supabase.table('news_updates').select('id', count='exact').execute()
+        headlines_count = supabase_db.supabase.table('headlines').select('id', count='exact').execute()
+        
+        return jsonify({
+            'status': 'healthy',
+            'database_connected': True,
+            'tables': {
+                'news_updates': updates_count.count,
+                'headlines': headlines_count.count
+            },
+            'last_update': supabase_db.get_latest_update_id(),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'database_connected': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 
 @api_bp.route('/model-info', methods=['GET'])
