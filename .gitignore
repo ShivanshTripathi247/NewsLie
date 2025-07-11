@@ -1,0 +1,5 @@
+backend/news_env
+backend/models
+
+__pycache__
+backend/routes/__pycache__

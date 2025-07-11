@@ -5,6 +5,8 @@ from config.settings import NEWS_SOURCES
 from services.redis_client import redis_client
 from services.news_processor import NewsProcessingService
 from services.live_feed_service import live_feed_service
+from services.chatbot_service import production_chatbot_service
+from services.fake_news_analyzer import fake_news_analyzer
 
 # Create Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
@@ -187,3 +189,48 @@ def get_live_feed_status():
             'message': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+    
+# Update the chat endpoint
+# Add these imports at the top
+from services.fake_news_analyzer import fake_news_analyzer
+
+# Add these new endpoints
+
+@api_bp.route('/analyze-news', methods=['POST'])
+def analyze_news():
+    """Analyze news for fake news detection"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        source_url = data.get('source_url', '')
+        
+        if not text:
+            return jsonify({
+                'error': 'Text is required for analysis'
+            }), 400
+        
+        if len(text) > 5000:
+            return jsonify({
+                'error': 'Text too long. Maximum 5000 characters.'
+            }), 400
+        
+        # Analyze the news text
+        analysis = fake_news_analyzer.analyze_news(text, source_url)
+        
+        return jsonify(analysis)
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'credibility_score': 50,
+            'risk_level': 'UNKNOWN'
+        }), 500
+
+@api_bp.route('/model-info', methods=['GET'])
+def get_model_info():
+    """Get information about the loaded fake news detection model"""
+    try:
+        info = fake_news_analyzer.get_model_info()
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
