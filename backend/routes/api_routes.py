@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime
 import json
 from config.settings import NEWS_SOURCES
+from services.global_database import global_db
 from services.redis_client import redis_client
 from services.news_processor import NewsProcessingService
 from services.live_feed_service import live_feed_service
@@ -13,6 +14,17 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # Initialize services
 news_service = NewsProcessingService()
+
+
+
+
+if __name__ == '__main__':
+    # Start scheduler
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    
+    # Start Flask app
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
 @api_bp.route('/categories', methods=['GET'])
 def get_categories():
@@ -225,6 +237,59 @@ def analyze_news():
             'credibility_score': 50,
             'risk_level': 'UNKNOWN'
         }), 500
+    
+# Add these new endpoints
+
+@api_bp.route('/check-updates/<client_update_id>', methods=['GET'])
+def check_for_updates(client_update_id):
+    """Check if mobile app needs to sync new data"""
+    try:
+        latest_update_id = global_db.get_latest_update_id()
+        
+        has_update = (client_update_id != latest_update_id) if client_update_id != 'none' else True
+        
+        return jsonify({
+            'hasUpdate': has_update,
+            'latestUpdateId': latest_update_id,
+            'clientUpdateId': client_update_id,
+            'serverTime': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/bulk-download/<update_id>', methods=['GET'])
+def download_bulk_update(update_id):
+    """Download complete dataset for mobile local storage"""
+    try:
+        if update_id == 'latest':
+            update_id = global_db.get_latest_update_id()
+        
+        if not update_id:
+            return jsonify({'error': 'No updates available'}), 404
+        
+        headlines = global_db.get_bulk_data_for_sync(update_id)
+        
+        return jsonify({
+            'updateId': update_id,
+            'headlines': headlines,
+            'totalCount': len(headlines),
+            'downloadTime': datetime.now().isoformat(),
+            'dataSize': f"{len(str(headlines)) / 1024:.1f} KB"
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/database-stats', methods=['GET'])
+def get_database_stats():
+    """Get database statistics for monitoring"""
+    try:
+        stats = global_db.get_database_stats()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @api_bp.route('/model-info', methods=['GET'])
 def get_model_info():

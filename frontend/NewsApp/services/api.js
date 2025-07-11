@@ -78,6 +78,17 @@ class NewsAPI {
         throw this.handleError(error);
     }
     }
+    async analyzeNews(text, sourceUrl = '') {
+      try {
+        const response = await this.client.post('/analyze-news', {
+          text: text,
+          source_url: sourceUrl
+        });
+        return response.data;
+      } catch (error) {
+        throw this.handleError(error);
+      }
+    }
 
 
   // Health check
@@ -86,6 +97,27 @@ class NewsAPI {
       const response = await this.client.get('/health');
       return response.data;
     } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+  async checkForUpdates(currentUpdateId) {
+    try {
+      console.log(`🔍 Checking updates for: ${currentUpdateId}`);
+      const response = await this.client.get(`/check-updates/${currentUpdateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Update check failed:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  async getBulkUpdate(updateId = 'latest') {
+    try {
+      console.log(`📥 Downloading bulk update: ${updateId}`);
+      const response = await this.client.get(`/bulk-download/${updateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Bulk download failed:', error);
       throw this.handleError(error);
     }
   }

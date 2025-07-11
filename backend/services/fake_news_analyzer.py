@@ -97,7 +97,8 @@ class ProductionFakeNewsAnalyzer:
             fact_sources = fact_result['sources']
             
             # Calculate composite credibility score
-            composite_score = (ml_score * 0.5) + (fact_score * 0.5)
+            realtime_score = self.fact_checker.simple_headline_check(text)
+            composite_score = (ml_score * 0.5) + (fact_score * 0.3) + (realtime_score * 0.2)
             
             # Generate comprehensive response
             return {
@@ -287,7 +288,30 @@ class EnhancedFactChecker:
         self.questionable_domains = [
             'infowars.com', 'naturalnews.com', 'beforeitsnews.com'
         ]
-    
+    def simple_headline_check(self, user_text):
+        """Simple real-time headline check - just 10 lines of code"""
+        import requests
+        import feedparser
+        
+        # Extract 2-3 key words from user input
+        key_words = [word for word in user_text.lower().split() if len(word) > 4][:3]
+        
+        # Check just one reliable RSS feed (Reuters)
+        try:
+            feed = feedparser.parse('https://feeds.reuters.com/reuters/topNews')
+            recent_headlines = [entry.title.lower() for entry in feed.entries[:20]]
+            
+            # Simple matching: if any key word appears in recent headlines
+            matches = sum(1 for headline in recent_headlines 
+                        for word in key_words if word in headline)
+            
+            # Simple scoring: more matches = more credible
+            return min(50 + (matches * 15), 85)  # Score between 50-85
+            
+        except:
+            return 50  # Neutral if search fails
+
+
     def comprehensive_analysis(self, text, source_url=""):
         """Perform comprehensive fact-checking analysis"""
         
