@@ -1,5 +1,7 @@
 backend/news_env
 backend/models
+backend/.env
 
+frontend/NewsApp/.env
 __pycache__
 backend/routes/__pycache__
