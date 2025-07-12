@@ -1,9 +1,12 @@
-news_env/
+backend/news_env/
 backend/models
-.env
+backend.env
  
-frontend/node_modules/
+ .env
 
-frontend/.expo/
+frontend/NewApp/.env
+frontend/NewApp/node_modules/
+
+frontend/NewApp/.expo/
 __pycache__
 backend/routes/__pycache__
