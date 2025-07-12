@@ -4,8 +4,8 @@ backend.env
  
  .env
 
-frontend/NewApp/.env
-frontend/NewApp/node_modules/
+frontend/NewsApp/.env
+frontend/NewsApp/node_modules/
 
 frontend/NewApp/.expo/
 __pycache__
