@@ -1,12 +1,41 @@
-backend/news_env/
-backend/models
-backend.env
- 
- .env
+backend/news_env/   
+# Your specific Python virtual environment
 
-frontend/NewsApp/.env
+# Python compiled files
+__pycache__/        
+# Python bytecode cache directories
+*.pyc               
+# Compiled Python files
+*.pyd               
+# Python dynamic library
+*.pyo               
+# Optimized Python bytecode
+
+# Backend specific environment files (if named differently)
+backend/.env        
+# Explicitly ignore .env in backend/
+
+# Models directory (if models are generated or too large for Git)
+# Use 'backend/models/' to ignore the entire directory
+backend/models/
+
+
+# Node modules
 frontend/NewsApp/node_modules/
 
-frontend/NewApp/.expo/
-__pycache__
-backend/routes/__pycache__
+# Expo specific build/cache directories
+frontend/NewsApp/.expo/
+frontend/NewsApp/.expo-shared/
+frontend/NewsApp/web-build/
+frontend/NewsApp/dist/
+
+# Expo environment files (if not covered by global .env)
+frontend/NewsApp/.env 
+# Explicitly ignore .env in frontend/NewsApp/
+
+# React Native temporary files
+*.iml
+*.js.map
+*.bundle
+.yarn/
+
