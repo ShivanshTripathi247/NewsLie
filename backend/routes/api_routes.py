@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 from config.settings import NEWS_SOURCES
 from services.global_database import global_db
-from services.redis_client import redis_client
+from services.supabase_client import supabase_db
 from services.news_processor import NewsProcessingService
 from services.live_feed_service import live_feed_service
 from services.chatbot_service import production_chatbot_service
@@ -55,7 +55,7 @@ def get_headlines(category, sentiment):
         images_only = request.args.get('images_only', default=False, type=bool)
         
         # Fetch from Redis (now includes image URLs)
-        headlines = redis_client.get_headlines(category, sentiment, limit)
+        headlines = supabase_db.get_headlines(category, sentiment, limit)
         
         # Apply filters
         filtered_headlines = []
@@ -93,7 +93,7 @@ def trigger_crawl():
         total_processed = news_service.crawl_and_process_news()
         
         # Get image statistics after crawl
-        image_stats = redis_client.get_image_stats(NEWS_SOURCES.keys())
+        image_stats = supabase_db.get_image_stats(NEWS_SOURCES.keys())
         
         return jsonify({
             'message': 'Enhanced news crawl completed successfully',
@@ -107,7 +107,7 @@ def trigger_crawl():
 def get_stats():
     """Get statistics about stored headlines"""
     try:
-        stats = redis_client.get_stats(NEWS_SOURCES.keys())
+        stats = supabase_db.get_stats(NEWS_SOURCES.keys())
         return jsonify({'stats': stats})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -116,7 +116,7 @@ def get_stats():
 def get_image_stats():
     """Get detailed statistics about headlines with images"""
     try:
-        image_stats = redis_client.get_image_stats(NEWS_SOURCES.keys())
+        image_stats = supabase_db.get_image_stats(NEWS_SOURCES.keys())
         return jsonify({'image_stats': image_stats})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -126,7 +126,7 @@ def health_check():
     """Health check endpoint"""
     try:
         # Test Redis connection
-        redis_client.ping()
+        supabase_db.ping()
         return jsonify({
             'status': 'healthy',
             'redis': 'connected',
@@ -244,8 +244,6 @@ def analyze_news():
 def debug_update(update_id):
     """Debug endpoint to check update data"""
     try:
-        from services.supabase_client import supabase_db
-        
         # Check if update exists
         update_result = supabase_db.supabase.table('news_updates')\
             .select('*')\
@@ -273,8 +271,6 @@ def debug_update(update_id):
 def check_for_updates(client_update_id):
     """Check if mobile app needs to sync new data with error handling"""
     try:
-        from services.supabase_client import supabase_db
-        
         latest_update_id = supabase_db.get_latest_update_id()
         
         if not latest_update_id:
@@ -312,7 +308,6 @@ def download_bulk_update(update_id):
         print(f"🔍 Bulk download requested for update_id: {update_id}")
         
         if update_id == 'latest':
-            from services.supabase_client import supabase_db
             update_id = supabase_db.get_latest_update_id()
             print(f"📋 Latest update_id resolved to: {update_id}")
         
@@ -321,7 +316,6 @@ def download_bulk_update(update_id):
             return jsonify({'error': 'No updates available'}), 404
         
         # Get headlines using your existing supabase client
-        from services.supabase_client import supabase_db
         headlines = supabase_db.get_bulk_data_for_sync(update_id)
         
         print(f"📊 Retrieved {len(headlines)} headlines from database")
@@ -385,8 +379,6 @@ def get_database_stats():
 def check_database_health():
     """Check database connectivity and health"""
     try:
-        from services.supabase_client import supabase_db
-        
         # Test basic connection
         result = supabase_db.supabase.table('news_updates').select('id').limit(1).execute()
         

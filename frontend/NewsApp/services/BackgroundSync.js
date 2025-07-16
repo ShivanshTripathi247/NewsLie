@@ -1,11 +1,13 @@
 import newsAPI from './api';
 import LocalDatabase from './LocalDatabase';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class BackgroundSyncService {
   constructor() {
     this.syncInProgress = false;
     this.lastSyncCheck = null;
+    this.lastLiveFeedSync = null;
     this.setupAppStateListener();
   }
 
@@ -14,10 +16,12 @@ class BackgroundSyncService {
       if (nextAppState === 'active') {
         // Check for updates when app becomes active
         this.checkForUpdatesIfNeeded();
+        this.syncLiveFeedIfNeeded();
       }
     });
   }
 
+  // 12-hour headlines sync
   async checkForUpdatesIfNeeded() {
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
@@ -82,28 +86,65 @@ class BackgroundSyncService {
     }
   }
 
+  // Live feed sync (hourly)
+  async syncLiveFeedIfNeeded() {
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
+
+    if (this.lastLiveFeedSync && (now - this.lastLiveFeedSync) < oneHour) {
+      console.log('⏰ Skipping live feed sync - too recent');
+      return false;
+    }
+
+    this.lastLiveFeedSync = now;
+    return await this.syncLiveFeed();
+  }
+
+  async syncLiveFeed() {
+    try {
+      console.log('🔄 Syncing live feed...');
+      const response = await newsAPI.getLiveFeed(true);
+      if (response && response.headlines) {
+        await AsyncStorage.setItem('livefeedheadlines', JSON.stringify(response.headlines));
+        console.log(`✅ Stored ${response.headlines.length} live feed headlines`);
+        return true;
+      } else {
+        console.log('❌ No live feed headlines received');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Live feed sync error:', error);
+      return false;
+    }
+  }
+
   async forceSync() {
     console.log('🔄 Force sync requested');
     this.lastSyncCheck = null;
-    return await this.syncIfNeeded();
+    this.lastLiveFeedSync = null;
+    await this.syncIfNeeded();
+    await this.syncLiveFeed();
   }
 
   startAutoSync() {
     console.log('🚀 Starting auto-sync service');
-    
-    // Initial sync
     this.syncIfNeeded();
+    this.syncLiveFeed();
     
-    // Check every 30 minutes
+    // Headlines sync every 30 min, live feed every hour
     setInterval(() => {
       this.checkForUpdatesIfNeeded();
     }, 30 * 60 * 1000);
+    setInterval(() => {
+      this.syncLiveFeedIfNeeded();
+    }, 60 * 60 * 1000);
   }
 
   getSyncStatus() {
     return {
       syncInProgress: this.syncInProgress,
-      lastSyncCheck: this.lastSyncCheck
+      lastSyncCheck: this.lastSyncCheck,
+      lastLiveFeedSync: this.lastLiveFeedSync
     };
   }
 }

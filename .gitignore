@@ -22,7 +22,7 @@ backend/models/
 .env
 
 *.env
-
+.pyc
 
 # Node modules
 frontend/NewsApp/node_modules/

@@ -3,10 +3,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Redis Configuration
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
-
 # Flask Configuration
 FLASK_PORT = int(os.getenv('PORT', 5000))
 FLASK_ENV = os.getenv('FLASK_ENV', 'development')

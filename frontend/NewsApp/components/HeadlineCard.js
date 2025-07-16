@@ -20,6 +20,21 @@ const HeadlineCard = ({ headline, onPress }) => {
 
   const hasImage = headline.image_url && !imageError;
 
+  const dateString = headline.created_at || headline.timestamp;
+  let displayDate = 'No Date';
+  if (dateString) {
+    const dateObj = new Date(dateString);
+    if (!isNaN(dateObj.getTime())) {
+      displayDate = dateObj.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+  }
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       {hasImage && (
@@ -45,7 +60,7 @@ const HeadlineCard = ({ headline, onPress }) => {
           </View>
           
           <Text style={styles.timestamp}>
-            {new Date(headline.timestamp).toLocaleDateString()}
+            {displayDate}
           </Text>
         </View>
       </View>

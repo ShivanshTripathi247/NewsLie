@@ -13,6 +13,8 @@ import {
 import newsAPI from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import LocalDatabase from '../services/LocalDatabase';
+import BackgroundSync from '../services/BackgroundSync';
 
 const LiveFeedScreen = ({ navigation }) => {
   const [headlines, setHeadlines] = useState([]);
@@ -22,44 +24,45 @@ const LiveFeedScreen = ({ navigation }) => {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    fetchLiveFeed();
+    loadLiveFeedFromLocal();
   }, []);
 
-  const fetchLiveFeed = async (forceRefresh = false) => {
+  const loadLiveFeedFromLocal = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
-      const response = await newsAPI.getLiveFeed(forceRefresh);
-      
-      if (response.headlines) {
-        // Clean and validate headlines data
-        const cleanedHeadlines = response.headlines
-          .filter(headline => headline && headline.headline) // Remove invalid items
-          .map((headline, index) => ({
-            ...headline,
-            // Ensure unique identifier exists
-            quick_id: headline.quick_id || headline.id || `generated_${Date.now()}_${index}`,
-            // Ensure required fields exist
-            source: headline.source || 'Unknown Source',
-            category: headline.category || 'general',
-            timestamp: headline.timestamp || new Date().toISOString()
-          }));
-        
-        setHeadlines(cleanedHeadlines);
-        setLastUpdated(new Date(response.timestamp));
+      const localHeadlines = await LocalDatabase.getLiveFeedHeadlines(30);
+      setHeadlines(localHeadlines);
+      if (!localHeadlines || localHeadlines.length === 0) {
+        // fallback to API if local is empty
+        await fetchLiveFeedFromAPI();
       }
     } catch (err) {
       setError(err.message);
-      console.error('LiveFeed fetch error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  const fetchLiveFeedFromAPI = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await newsAPI.getLiveFeed(true);
+      setHeadlines(response.headlines || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchLiveFeed(true);
+    await BackgroundSync.syncLiveFeed();
+    await loadLiveFeedFromLocal();
   };
 
   const handleHeadlinePress = async (headline) => {
@@ -140,7 +143,7 @@ const LiveFeedScreen = ({ navigation }) => {
   }
 
   if (error && headlines.length === 0) {
-    return <ErrorMessage message={error} onRetry={() => fetchLiveFeed(true)} />;
+    return <ErrorMessage message={error} onRetry={() => fetchLiveFeedFromAPI()} />;
   }
 
   return (

@@ -1,10 +1,10 @@
 import json
 from config.settings import NEWS_SOURCES
 from .news_scraper import NewsScraperService
-from .redis_client import redis_client
 from .sentiment_analyzer import SentimentAnalyzer
 
 from services.global_database import global_db
+from .supabase_client import supabase_db
 
 class NewsProcessingService:
     """Service for processing and storing news data with enhanced image support"""
@@ -47,7 +47,7 @@ class NewsProcessingService:
                             all_headlines.append(news_item)
                             
                             # Still store in Redis for immediate API access
-                            self._store_headline(news_item)
+                            supabase_db.store_headline(news_item)
                             
                         except Exception as e:
                             print(f"Error processing headline: {e}")
@@ -63,14 +63,3 @@ class NewsProcessingService:
         
         print(f"Global crawl completed. Total headlines: {len(all_headlines)}")
         return len(all_headlines)
-    def _store_headline(self, news_item):
-        """Store headline in Redis with image URL support"""
-        try:
-            # Ensure image_url field exists (backward compatibility)
-            if 'image_url' not in news_item:
-                news_item['image_url'] = ""
-            
-            # Pass the dictionary directly to Redis client
-            redis_client.store_headline(news_item)
-        except Exception as e:
-            print(f"Error storing headline: {e}")

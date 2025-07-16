@@ -1,5 +1,5 @@
 from .live_feed_scraper import LiveFeedScraperService
-from .live_feed_redis import live_feed_redis
+from .supabase_client import supabase_db
 import threading
 import time
 
@@ -14,14 +14,8 @@ class LiveFeedService:
         """Get live feed headlines with caching"""
         try:
             # Check cache first unless force refresh
-            if not force_refresh and live_feed_redis.is_cache_valid():
-                cached_data = live_feed_redis.get_live_headlines()
-                if cached_data:
-                    return {
-                        'success': True,
-                        'data': cached_data,
-                        'from_cache': True
-                    }
+            # The original code had Redis cache checks, which are removed.
+            # For now, we'll just fetch fresh data.
             
             # Fetch fresh data
             return self._fetch_fresh_headlines()
@@ -36,14 +30,15 @@ class LiveFeedService:
     def _fetch_fresh_headlines(self):
         """Fetch fresh headlines from sources"""
         try:
-            live_feed_redis.update_status('fetching', 'Fetching latest headlines...')
+            # The original code had Redis status updates, which are removed.
+            # For now, we'll just proceed with fetching.
             
             # Get headlines from scraper
             headlines = self.scraper.get_quick_headlines(limit=30)
             
             if headlines:
                 # Store in Redis
-                live_feed_redis.store_live_headlines(headlines)
+                supabase_db.store_live_headlines(headlines)
                 
                 return {
                     'success': True,
@@ -55,7 +50,8 @@ class LiveFeedService:
                     'from_cache': False
                 }
             else:
-                live_feed_redis.update_status('error', 'No headlines found')
+                # The original code had Redis status updates, which are removed.
+                # For now, we'll just return an error.
                 return {
                     'success': False,
                     'error': 'No headlines found',
@@ -63,7 +59,8 @@ class LiveFeedService:
                 }
                 
         except Exception as e:
-            live_feed_redis.update_status('error', str(e))
+            # The original code had Redis status updates, which are removed.
+            # For now, we'll just return an error.
             return {
                 'success': False,
                 'error': str(e),
@@ -87,7 +84,12 @@ class LiveFeedService:
     
     def get_status(self):
         """Get current live feed status"""
-        return live_feed_redis.get_status()
+        # The original code had Redis status retrieval, which is removed.
+        # For now, we'll return a placeholder.
+        return {
+            'status': 'Service is running',
+            'last_refresh': 'N/A'
+        }
 
 # Global live feed service
 live_feed_service = LiveFeedService()

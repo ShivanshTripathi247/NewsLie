@@ -16,6 +16,9 @@ class SupabaseService:
         """Store news update with robust error handling and retry logic"""
         for attempt in range(self.max_retries):
             try:
+                # Delete all old headlines and updates before inserting new
+                self.supabase.table('headlines').delete().neq('id', 0).execute()
+                self.supabase.table('news_updates').delete().neq('id', 0).execute()
                 update_id = f"global_{datetime.now().strftime('%Y%m%d_%H%M')}"
                 
                 # Check if update already exists to prevent duplicates
@@ -85,6 +88,23 @@ class SupabaseService:
                     print(f"❌ All {self.max_retries} attempts failed")
                     raise e
     
+    def store_headline(self, news_item):
+        """Store a single headline in Supabase."""
+        try:
+            result = self.supabase.table('headlines').insert({
+                'headline': news_item['headline'],
+                'category': news_item['category'],
+                'sentiment': news_item['sentiment'],
+                'confidence': news_item.get('confidence', 0),
+                'source_url': news_item.get('source_url', ''),
+                'image_url': news_item.get('image_url', ''),
+                'created_at': news_item.get('created_at', None),
+            }).execute()
+            return result
+        except Exception as e:
+            print(f"❌ Error storing headline: {e}")
+            return None
+    
     def get_latest_update_id(self):
         """Get most recent update ID with error handling"""
         try:
@@ -148,7 +168,7 @@ class SupabaseService:
                     'confidence': float(row.get('confidence', 0)),
                     'source_url': row.get('source_url', ''),
                     'image_url': row.get('image_url', ''),
-                    'timestamp': row.get('created_at', datetime.now().isoformat())
+                    'created_at': row.get('created_at', datetime.now().isoformat())
                 })
             
             print(f"✅ Formatted {len(formatted_headlines)} headlines for mobile")
@@ -157,6 +177,42 @@ class SupabaseService:
         except Exception as e:
             print(f"❌ Error getting bulk data: {e}")
             return []
+
+    def get_headlines(self, category, sentiment, limit=20):
+        """Fetch headlines by category and sentiment."""
+        try:
+            result = self.supabase.table('headlines') \
+                .select('*') \
+                .eq('category', category) \
+                .eq('sentiment', sentiment) \
+                .order('created_at', desc=True) \
+                .limit(limit) \
+                .execute()
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"❌ Error fetching headlines: {e}")
+            return []
+
+    def store_live_headlines(self, headlines):
+        """Store a batch of live feed headlines."""
+        try:
+            # Delete all old live feed headlines before inserting new
+            self.supabase.table('live_feed_headlines').delete().neq('id', 0).execute()
+            result = self.supabase.table('live_feed_headlines').insert(headlines).execute()
+            return result
+        except Exception as e:
+            print(f"❌ Error storing live feed headlines: {e}")
+            return None
+
+    def ping(self):
+        """Check Supabase connection health."""
+        try:
+            # Try a simple select from a small table
+            result = self.supabase.table('news_updates').select('id').limit(1).execute()
+            return True
+        except Exception as e:
+            print(f"❌ Supabase ping failed: {e}")
+            return False
 
 # Global instance
 supabase_db = SupabaseService()

@@ -5,6 +5,8 @@ import newsAPI from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import HeadlineCard from '../components/HeadlineCard';
+import LocalDatabase from '../services/LocalDatabase';
+import BackgroundSync from '../services/BackgroundSync';
 
 
 const HeadlinesScreen = ({ route, navigation }) => {
@@ -16,10 +18,28 @@ const HeadlinesScreen = ({ route, navigation }) => {
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    fetchHeadlines();
+    loadHeadlinesFromLocal();
   }, []);
 
-  const fetchHeadlines = async () => {
+  const loadHeadlinesFromLocal = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const localHeadlines = await LocalDatabase.getHeadlines(category, sentiment, 50);
+      setHeadlines(localHeadlines);
+      if (!localHeadlines || localHeadlines.length === 0) {
+        // fallback to API if local is empty
+        await fetchHeadlinesFromAPI();
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchHeadlinesFromAPI = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -33,9 +53,10 @@ const HeadlinesScreen = ({ route, navigation }) => {
     }
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchHeadlines();
+    await BackgroundSync.syncIfNeeded();
+    await loadHeadlinesFromLocal();
   };
 
   const getFilteredHeadlines = () => {
@@ -103,7 +124,7 @@ const handleHeadlinePress = async (headline) => {
   }
 
   if (error) {
-    return <ErrorMessage message={error} onRetry={fetchHeadlines} />;
+    return <ErrorMessage message={error} onRetry={fetchHeadlinesFromAPI} />;
   }
 
   const sentimentConfig = APP_CONFIG.SENTIMENTS[sentiment];

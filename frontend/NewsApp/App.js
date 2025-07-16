@@ -11,6 +11,8 @@ import LiveFeedScreen from './screens/LiveFeedScreen';
 import FactCheckerScreen from './screens/FactCheckerScreen'; // NEW
 import BackgroundSync from './services/BackgroundSync';
 import LocalDatabase from './services/LocalDatabase';
+import NetInfo from '@react-native-community/netinfo';
+import { SafeAreaView } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -83,6 +85,14 @@ function MainTabs() {
 export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -116,9 +126,18 @@ export default function App() {
   }, []);
 
   return (
-    <NavigationContainer>
-      <MainTabs />
-    </NavigationContainer>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+      {isOffline && (
+        <View style={{ backgroundColor: '#e74c3c', padding: 8 }}>
+          <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+            You are offline. Showing cached news.
+          </Text>
+        </View>
+      )}
+      <NavigationContainer>
+        <MainTabs />
+      </NavigationContainer>
+    </SafeAreaView>
   );
 }
 

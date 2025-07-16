@@ -162,6 +162,36 @@ class LocalDatabase {
       return [];
     }
   }
+
+  // Save live feed headlines to local storage
+  async saveLiveFeedHeadlines(headlines) {
+    try {
+      await AsyncStorage.setItem('livefeedheadlines', JSON.stringify(headlines));
+      console.log(`✅ Saved ${headlines.length} live feed headlines to local storage`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to save live feed headlines:', error);
+      return false;
+    }
+  }
+
+  // Get live feed headlines from local storage
+  async getLiveFeedHeadlines(limit = 30) {
+    try {
+      const stored = await AsyncStorage.getItem('livefeedheadlines');
+      if (stored) {
+        const headlines = JSON.parse(stored);
+        console.log(`📱 Retrieved ${headlines.length} live feed headlines from local storage`);
+        return headlines.slice(0, limit);
+      } else {
+        console.log('📱 No live feed headlines found in local storage');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error retrieving live feed headlines:', error);
+      return [];
+    }
+  }
 }
 
 export default new LocalDatabase();
